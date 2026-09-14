@@ -126,22 +126,23 @@ async def test_the_partial_unique_index_rejects_a_live_duplicate(
     service = students(session, principal_a)
     first = await service.create(student_payload(student_number="S-DUP"))
 
-    with pytest.raises(IntegrityError), session.begin_nested():
-        session.add(
-            Student(
-                id=uuid.uuid4(),
-                tenant_id=TENANT_A,
-                student_number="S-DUP",
-                first_name="Grace",
-                last_name="Hopper",
-                email="grace@example.com",
-                email_normalized="grace@example.com",
-                status="active",
-                student_metadata={},
-                created_by="test",
+    with pytest.raises(IntegrityError):
+        async with session.begin_nested():
+            session.add(
+                Student(
+                    id=uuid.uuid4(),
+                    tenant_id=TENANT_A,
+                    student_number="S-DUP",
+                    first_name="Grace",
+                    last_name="Hopper",
+                    email="grace@example.com",
+                    email_normalized="grace@example.com",
+                    status="active",
+                    student_metadata={},
+                    created_by="test",
+                )
             )
-        )
-        await session.flush()
+            await session.flush()
 
     assert first.student_number == "S-DUP"
 
@@ -178,18 +179,19 @@ async def test_the_composite_foreign_key_refuses_a_cross_tenant_enrolment(
     foreign_course = await courses(session, principal_b).create(course_payload())
     await session.flush()
 
-    with pytest.raises(IntegrityError), session.begin_nested():
-        session.add(
-            Enrolment(
-                id=uuid.uuid4(),
-                tenant_id=TENANT_A,
-                student_id=student.id,
-                course_id=foreign_course.id,
-                status="enrolled",
-                enrolled_at=datetime.now(UTC),
+    with pytest.raises(IntegrityError):
+        async with session.begin_nested():
+            session.add(
+                Enrolment(
+                    id=uuid.uuid4(),
+                    tenant_id=TENANT_A,
+                    student_id=student.id,
+                    course_id=foreign_course.id,
+                    status="enrolled",
+                    enrolled_at=datetime.now(UTC),
+                )
             )
-        )
-        await session.flush()
+            await session.flush()
 
 
 async def test_a_student_cannot_be_enrolled_twice_even_by_a_direct_insert(
@@ -202,18 +204,19 @@ async def test_a_student_cannot_be_enrolled_twice_even_by_a_direct_insert(
     enrolment, _ = await enrolments(session, principal_a).enrol(student.id, course.id)
     await session.flush()
 
-    with pytest.raises(IntegrityError), session.begin_nested():
-        session.add(
-            Enrolment(
-                id=uuid.uuid4(),
-                tenant_id=TENANT_A,
-                student_id=student.id,
-                course_id=course.id,
-                status="enrolled",
-                enrolled_at=datetime.now(UTC),
+    with pytest.raises(IntegrityError):
+        async with session.begin_nested():
+            session.add(
+                Enrolment(
+                    id=uuid.uuid4(),
+                    tenant_id=TENANT_A,
+                    student_id=student.id,
+                    course_id=course.id,
+                    status="enrolled",
+                    enrolled_at=datetime.now(UTC),
+                )
             )
-        )
-        await session.flush()
+            await session.flush()
 
     assert enrolment.id is not None
 
@@ -257,9 +260,10 @@ async def test_the_check_constraints_reject_a_status_the_schema_would_not_accept
     A unit test already asserts the `Literal` and the CHECK constraint agree in
     the model metadata. This asserts the CHECK actually reached the database.
     """
-    with pytest.raises((IntegrityError, DBAPIError)), session.begin_nested():
-        session.add(row())  # type: ignore[operator]
-        await session.flush()
+    with pytest.raises((IntegrityError, DBAPIError)):
+        async with session.begin_nested():
+            session.add(row())  # type: ignore[operator]
+            await session.flush()
 
 
 # ── The audit trail ─────────────────────────────────────────────────────────

@@ -42,7 +42,9 @@ class Enrolment(Base, TimestampMixin):
     student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     course_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
 
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="enrolled")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="enrolled", server_default="enrolled"
+    )
     grade: Mapped[str | None] = mapped_column(String(8))
     enrolled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -51,7 +51,9 @@ class IngestionJob(Base, TimestampMixin):
     # redelivery into a no-op instead of a duplicate set of chunks.
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
 
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="queued", server_default="queued"
+    )
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     # Not visible to a consumer until this time -- drives both the initial
     # enqueue and the exponential backoff after a failure.

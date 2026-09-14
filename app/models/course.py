@@ -28,7 +28,9 @@ class Course(Base, TimestampMixin):
     # No foreign key: this identifies a user in the auth service's database.
     teacher_user_id: Mapped[str | None] = mapped_column(String(128))
     credits: Mapped[int | None] = mapped_column(Integer)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="active", server_default="active"
+    )
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "code", name="uq_courses_tenant_code"),

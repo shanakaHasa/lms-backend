@@ -33,7 +33,9 @@ class Student(Base, TimestampMixin):
     email_normalized: Mapped[str] = mapped_column(String(320), nullable=False)
     year_level: Mapped[int | None] = mapped_column(Integer)
 
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="active", server_default="active"
+    )
     student_metadata: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )

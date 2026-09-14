@@ -46,8 +46,12 @@ class CourseMaterial(Base, TimestampMixin):
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     page_count: Mapped[int | None] = mapped_column(Integer)
 
-    doc_type: Mapped[str] = mapped_column(String(32), nullable=False, default="syllabus")
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    doc_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="syllabus", server_default="syllabus"
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="pending", server_default="pending"
+    )
     error: Mapped[str | None] = mapped_column(Text)
     uploaded_by: Mapped[str] = mapped_column(String(128), nullable=False)
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

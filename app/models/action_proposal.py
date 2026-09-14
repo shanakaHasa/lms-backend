@@ -62,7 +62,9 @@ class ActionProposal(Base, TimestampMixin):
     # SHA-256 over the canonical arguments.
     args_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default="pending"
+    )
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
