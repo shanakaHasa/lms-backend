@@ -212,8 +212,15 @@ async def verify_token(token: str) -> Principal:
     if not tenant_id:
         raise Unauthorized("token has no tenant claim")
 
+    # `.get`, not `claims["sub"]`. A KeyError is not a PyJWTError, so it would
+    # escape the handler above and surface as a 500 -- a malformed token must
+    # never produce a server error.
+    subject = claims.get("sub")
+    if not subject:
+        raise Unauthorized("token has no subject claim")
+
     return Principal(
-        user_id=claims["sub"],
+        user_id=str(subject),
         tenant_id=str(tenant_id),
         email=claims.get("email"),
         scopes=frozenset(str(claims.get("scope", "")).split()),
