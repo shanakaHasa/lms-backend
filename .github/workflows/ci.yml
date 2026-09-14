@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -95,7 +95,9 @@ jobs:
       - name: No un-migrated model changes
         run: alembic check
       - name: Integration suite
-        run: pytest tests/integration -q
+        # The marker is excluded by default in pyproject so a laptop run
+        # needs no database; this is the job that opts back in.
+        run: pytest tests/integration -q -m integration
 
   build:
     runs-on: ubuntu-latest

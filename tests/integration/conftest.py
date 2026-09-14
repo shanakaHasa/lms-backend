@@ -40,7 +40,7 @@ ALL_SCOPES = frozenset(
 
 @pytest.fixture
 async def session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine(settings.database_url, poolclass=None)
+    engine = create_async_engine(settings.database_url)
     try:
         connection = await engine.connect()
     except Exception as exc:  # pragma: no cover - only when no database is up
