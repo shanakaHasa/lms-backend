@@ -18,7 +18,7 @@ dependencies = [
   # web
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
-  "pydantic>=2.9",
+  "pydantic[email]>=2.9",
   "pydantic-settings>=2.6",
   "python-multipart>=0.0.12",
   "sse-starlette>=2.1",
@@ -95,7 +95,11 @@ exclude = ["alembic/versions/"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+# Integration tests need a real Postgres and are skipped by default, so a
+# `pytest` on a laptop runs green with nothing installed. Phase 2 and CI run
+# them explicitly with `pytest -m integration` once `alembic upgrade head` has
+# been applied.
+addopts = "-ra --strict-markers -m 'not integration'"
 markers = [
   "integration: needs a real Postgres",
   "serial: needs real commits, cannot run under transaction rollback",

@@ -46,12 +46,12 @@ seed:      ## Seed a local institution (step B3)
 
 # ── Quality ─────────────────────────────────────────────────────────────────
 
-test:      ## Everything
+test:      ## Unit suite (integration is excluded by default; see test-int)
 	$(PY) -m pytest
 test-unit: ## Unit only -- no database, runs anywhere, fast
 	$(PY) -m pytest tests/unit
-test-int:  ## Integration -- needs TEST_DATABASE_URL
-	$(PY) -m pytest tests/integration
+test-int:  ## Integration -- needs a real Postgres with migrations applied
+	$(PY) -m pytest tests/integration -m integration
 
 lint:      ## Lint
 	$(PY) -m ruff check .
