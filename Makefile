@@ -1,0 +1,66 @@
+.PHONY: help venv lock api worker migrate revision downgrade seed test test-unit test-int lint fmt typecheck drift check db-check clean
+
+# Cross-platform: GNU Make sets OS=Windows_NT on Windows. Without this, every
+# target is unusable on Linux -- which is where CI runs.
+ifeq ($(OS),Windows_NT)
+	PY := .venv/Scripts/python.exe
+else
+	PY := .venv/bin/python
+endif
+
+help:
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+
+venv:      ## Create the venv and install with dev extras
+	python -m venv .venv
+	$(PY) -m pip install --upgrade pip
+	$(PY) -m pip install -e ".[dev]"
+
+venv-rag:  ## Add the retrieval stack (step B5)
+	$(PY) -m pip install -e ".[dev,rag]"
+venv-agent: ## Add the agent stack (step B6)
+	$(PY) -m pip install -e ".[dev,rag,agent]"
+
+lock:      ## Freeze the resolved tree so builds are reproducible
+	$(PY) -m pip freeze --exclude-editable > requirements.lock
+
+api:       ## Run the API with reload on :8000
+	$(PY) -m uvicorn app.main:app --reload --port 8000
+worker:    ## Run the ingestion worker (step B4)
+	$(PY) -m app.ingestion.worker
+
+# ── Database ────────────────────────────────────────────────────────────────
+
+db-check:  ## Verify the database is reachable; report version and latency
+	$(PY) -m app.cli db-check
+migrate:   ## Apply migrations
+	$(PY) -m alembic upgrade head
+revision:  ## Autogenerate a migration: make revision m="add x"
+	$(PY) -m alembic revision --autogenerate -m "$(m)"
+downgrade: ## Roll back one migration
+	$(PY) -m alembic downgrade -1
+drift:     ## Diff model DDL against migration DDL -- needs no database
+	$(PY) scripts/check_migration_drift.py
+seed:      ## Seed a local institution (step B3)
+	$(PY) -m app.cli seed-dev
+
+# ── Quality ─────────────────────────────────────────────────────────────────
+
+test:      ## Everything
+	$(PY) -m pytest
+test-unit: ## Unit only -- no database, runs anywhere, fast
+	$(PY) -m pytest tests/unit
+test-int:  ## Integration -- needs TEST_DATABASE_URL
+	$(PY) -m pytest tests/integration
+
+lint:      ## Lint
+	$(PY) -m ruff check .
+typecheck: ## Type check
+	$(PY) -m mypy app
+fmt:       ## Format and autofix
+	$(PY) -m ruff format .
+	$(PY) -m ruff check --fix .
+check: lint typecheck drift test-unit  ## What CI runs before the integration stage
+
+clean:
+	rm -rf .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage

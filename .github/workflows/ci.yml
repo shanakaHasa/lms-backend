@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # Everything below runs in parallel. `gate` at the bottom is the single
+  # required status check, so adding a job here automatically makes it blocking.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy app
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      # The unit suite needs no database, which is why it is a separate job
+      # from the migration one -- it gives a fast signal.
+      - run: pytest tests/unit -q --cov=app --cov-report=term-missing
+
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      # Catches a model changed without a migration, and a migration whose
+      # object names do not match the models. No database required.
+      - run: python scripts/check_migration_drift.py
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: teachassist
+          POSTGRES_PASSWORD: teachassist
+          POSTGRES_DB: lmsdb_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U teachassist"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      # A container on the runner, so TLS is neither available nor meaningful.
+      DATABASE_URL: postgresql+asyncpg://teachassist:teachassist@localhost:5432/lmsdb_test
+      DB_SSL_MODE: disable
+      APP_ENV: local
+      AUTH_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: Applies from empty
+        run: alembic upgrade head
+      - name: Rolls back
+        # A migration nobody can reverse is a migration nobody can deploy
+        # confidently. Catch it here, not during an incident.
+        run: alembic downgrade base
+      - name: Re-applies
+        run: alembic upgrade head
+      - name: No un-migrated model changes
+        run: alembic check
+      - name: Integration suite
+        run: pytest tests/integration -q
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: teachassist-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: teachassist-backend:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+  gate:
+    # The single required check. Adding a job above makes it blocking without
+    # anyone having to remember to update branch protection.
+    if: always()
+    needs: [lint, test, drift, migrations, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any job did not succeed
+        run: |
+          echo '${{ toJSON(needs) }}' | grep -q '"result": *"failure"' && exit 1
+          echo '${{ toJSON(needs) }}' | grep -q '"result": *"cancelled"' && exit 1
+          exit 0
